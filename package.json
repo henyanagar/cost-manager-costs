@@ -1,0 +1,20 @@
+{
+  "name": "cost-manager-costs",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node ./bin/www",
+    "test": "mocha tests/test.js --exit"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "express": "~4.16.1",
+    "mongoose": "^9.0.2",
+    "pino": "^10.1.0"
+  },
+  "devDependencies": {
+    "chai": "^6.2.2",
+    "mocha": "^11.7.5",
+    "supertest": "^7.1.4"
+  }
+}

@@ -1,0 +1,5 @@
+### Get Monthly Report
+#GET http://localhost:3002/api/report?id=123124&year=2026&month=1
+###
+GET http://localhost:3002/api/total/123123
+
