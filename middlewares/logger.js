@@ -1,30 +1,44 @@
+// Pino logger middleware
+// Logs every HTTP request locally and to logs service
 const pino = require('pino')();
 
+// Middleware to log every HTTP request
 const requestLogger = async (req, res, next) => {
-    const logData = {
-        method: req.method,
-        url: req.url,
-        params: req.params,
-        query: req.query,
-        timestamp: new Date()
-    };
+    // Wait for response to finish to get status code
+    res.on('finish', async () => {
+        const logData = {
+            service: 'costs-service',
+            level: res.statusCode >= 400 ? 'error' : 'info',
+            msg: `${req.method} ${req.originalUrl} - ${res.statusCode}`,
+            method: req.method,
+            url: req.originalUrl,
+            statusCode: res.statusCode,
+            time: Date.now()
+        };
 
-    // Log to console using Pino
-    pino.info(logData, `Request received for ${req.url}`);
+        // Local log for console
+        pino.info(logData.msg);
 
-    // Send to Log Process (Process 1)
-    try {
-        const logApiUrl = process.env.LOG_API_URL || 'http://localhost:3001';
-     /*   await fetch(`${logApiUrl}/api/logs`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(logData)
-        });*/
-    } catch (err) {
-        pino.error("Failed to send log to Log Process", err.message);
-    }
+        // Remote log to Logs API database
+        try {
+            const logApiUrl = `${process.env.LOG_API_URL}/api/logs/add`;
+            if (logApiUrl) {
+                await fetch(logApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(logData)
+                });
+            }
+        } catch (err) {
+            // Fallback if Logs API is down
+            pino.error(`Remote log failed: ${err.message}`);
+        }
+    });
 
     next();
 };
 
-module.exports = requestLogger;
+module.exports = {
+    requestLogger,
+    pino
+};

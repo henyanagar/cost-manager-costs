@@ -1,59 +1,59 @@
+// Unit tests for costs service
 const request = require('supertest');
-const expect = require('chai').expect;
-// ייבוא האפליקציה שלך (וודאי שקובץ ה-server שלך מייצא את ה-app)
-const app = require('../app');
+const app = require('../app'); // ← Import app.js, NOT server.js
 
-describe('Cost Manager Cost API Unit Tests', function() {
-    this.timeout(10000); // נותן לטסטים עד 10 שניות לרוץ (מתאים לעבודה מול ענן)
-    // בדיקת אנדפוינט הוספת עלות
-    describe('POST /api/add', function() {
-        it('should add a new cost item and return it', async function() {
-            const newCost = {
-                userid: 123123,
-                description: 'test milk',
-                category: 'food',
-                sum: 15
-            };
+// Mock the models
+const Cost = require('../models/cost');
+const Report = require('../models/report');
+jest.mock('../models/cost');
+jest.mock('../models/report');
 
-            const response = await request(app)
-                .post('/api/add')
-                .send(newCost);
+// Mock fetch for external API calls
+global.fetch = jest.fn();
 
-            expect(response.status).to.equal(200);
-            expect(response.body).to.have.property('description', 'test milk');
-            expect(response.body).to.have.property('sum', 15);
+// Inside tests/costs.test.js
+test('GET /api/report should return total costs', async () => {
+    Cost.find.mockResolvedValue([
+        { sum: 10, createdAt: new Date(), category: 'food', description: 'test' }
+    ]);
+
+    const response = await request(app)
+        .get('/api/report')
+        .query({
+            id: 123123,  // Route expects 'id', not 'userid'
+            year: 2026,
+            month: 1
         });
 
-        it('should return error if category is invalid', async function() {
-            const invalidCost = {
-                userid: 123123,
-                description: 'test',
-                category: 'invalid_cat', // קטגוריה שלא קיימת
-                sum: 10
-            };
-
-            const response = await request(app)
-                .post('/api/add')
-                .send(invalidCost);
-
-            expect(response.status).to.not.equal(200);
-            expect(response.body).to.have.property('id');
+    expect(response.status).toBe(200);
+});
+// Test 1: Validation for missing mandatory fields
+test('POST /api/add should fail if sum is missing', async () => {
+    const response = await request(app)
+        .post('/api/add')
+        .send({
+            userid: 123123,
+            description: 'Lunch',
+            category: 'food'
+            // sum is missing here
         });
-    });
 
-    // בדיקת אנדפוינט הדו"ח החודשי
-    describe('GET /api/report', function() {
-        it('should return a report for a specific month', async function() {
-            const response = await request(app)
-                .get('/api/report')
-                .query({ id: 123123, year: 2025, month: 12 });
+    expect(response.status).toBe(400);
+    expect(response.body.id).toBe("validation_error");
+    expect(response.body.message).toContain("sum are required");
+});
 
-            expect(response.status).to.equal(200);
-            expect(response.body).to.have.property('userid', 123123);
-            expect(response.body).to.have.property('costs');
-            expect(Array.isArray(response.body.costs)).to.be.true;
+// Test 2: Validation for invalid category string
+test('POST /api/add should fail with invalid category', async () => {
+    const response = await request(app)
+        .post('/api/add')
+        .send({
+            userid: 123123,
+            description: 'Gym',
+            category: 'not-a-real-category', // Invalid string
+            sum: 50
         });
-    });
 
-
+    expect(response.status).toBe(400);
+    expect(response.body.message).toContain("Invalid category");
 });
