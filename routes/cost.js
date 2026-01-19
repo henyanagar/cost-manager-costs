@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const Cost = require('../models/cost');
 const Report = require('../models/report');
+//const { pino: logger,logEvent } = require('../middlewares/logger');
+const { pino: logger } = require('../middlewares/logger');
 
-
+// const { pino: requestLogger } = require('../middlewares/logger');
 /**
  * Endpoint: GET /api/total/:userid
  * Purpose: Helper for the User Process to calculate the 'total' field.
@@ -52,7 +54,7 @@ router.post('/add', async (req, res) => {
                 message: "Cost cannot be added: User does not exist."
             });
         }
-        console.log('userApiUrl', `${userApiUrl}/api/users/${userid}`);
+       // console.log('userApiUrl', `${userApiUrl}/api/users/${userid}`);
 
         // 3. Create the Cost Item
         // If year/month/day aren't provided, server uses current time
@@ -69,12 +71,13 @@ router.post('/add', async (req, res) => {
         });
 
         const savedCost = await newCost.save();
-        console.log('savedCost', savedCost);
-
+        //console.log('savedCost', savedCost);
+       // await logEvent({ userid: req.body.userid }, "Cost item successfully saved to DB");
+        logger.info({ userid: req.body.userid }, "Cost item successfully saved to DB");
         // 4. Log the access (Requirement: Pino + Log collection)
         // Note: The middleware usually handles general logs, but specific
         // endpoint logging is often done inside the logic for tracking successes.
-    //    logger.info({ userid, category, sum }, "New cost item added successfully");
+     // pino.info({ userid, category, sum }, "New cost item added successfully");
 
         // Return JSON document describing the added item
         res.status(201).json(savedCost);
@@ -118,12 +121,12 @@ router.get('/report', async (req, res) => {
                 console.log('inside if  search result:', existingReport);
                 return res.json(existingReport);// החזרת הדוח השמור
             }
-            console.log('inside if  is past month result:', existingReport);
+          //  console.log('inside if  is past month result:', existingReport);
           }
         // if (existingReport) {
         //     return res.json(existingReport.data);// החזרת הדוח השמור
         // }
-        console.log('we allready have report or month is not passed', isPastMonth);
+      //  console.log('we allready have report or month is not passed', isPastMonth);
         // 3. Compute the data (Needed for both current month and "missing" past reports)
         const startDate = new Date(year, month - 1, 1);
         const endDate = new Date(year, month, 1);
@@ -155,7 +158,7 @@ router.get('/report', async (req, res) => {
             month: queryMonth,
             costs: costsGrouped
         };
-
+        logger.info({ userid: userid }, "Generate report");
         // 4. Save to cache ONLY if the month has passed (The Computed Design Pattern)
         if (isPastMonth) {
             const newReport = new Report(reportData);
