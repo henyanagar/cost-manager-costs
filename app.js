@@ -14,7 +14,6 @@ app.use(requestLogger);
 // Routes
 app.use('/api', costsRoutes);
 
-
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({

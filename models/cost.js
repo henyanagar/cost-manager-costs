@@ -1,18 +1,35 @@
+// Schema for costs collection
+// Stores cost items with category validation
 const mongoose = require('mongoose');
 
-// Schema for individual cost items
 const costSchema = new mongoose.Schema({
-    description: { type: String, required: true },
+    description: {
+        type: String,
+        required: true
+    },
     category: {
         type: String,
         required: true,
-        // Must be one of: food, health, housing, sports, education
         enum: ['food', 'health', 'housing', 'sports', 'education']
     },
-    userid: { type: Number, required: true },
-    sum: { type: Number, required: true },// Mongoose uses Number for Double values
-    // Adding date property to support the monthly report and Computed Pattern
-    createdAt: { type: Date, default: Date.now } // Uses current time if not provided
+    userid: {
+        type: Number,
+        required: true
+    },
+    sum: {
+        type: Number,
+        required: true
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    }
+}, {
+    versionKey: false,
+    collection: 'costs'
 });
-costSchema.index({ userid: 1});
+
+// Index for faster queries by userid
+costSchema.index({ userid: 1 });
+
 module.exports = mongoose.model('Cost', costSchema);

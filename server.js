@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const { pino } = require('./middlewares/logger');
 require('dotenv').config();
 
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.PORT || 3002;
 
 // Connect to MongoDB then start server
 mongoose.connect(process.env.MONGODB_URI)

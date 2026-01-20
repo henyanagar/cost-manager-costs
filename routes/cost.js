@@ -1,275 +1,104 @@
-// const express = require('express');
-// const router = express.Router();
-// const Cost = require('../models/cost');
-// const Report = require('../models/report');
-// //const { pino: logger,logEvent } = require('../middlewares/logger');
-// const { pino: logger } = require('../middlewares/logger');
-//
-// // const { pino: requestLogger } = require('../middlewares/logger');
-// /**
-//  * Endpoint: GET /api/total/:userid
-//  * Purpose: Helper for the User Process to calculate the 'total' field.
-//  */
-// router.get('/total/:userid', async (req, res) => {
-//
-//     const { userid } = req.params;
-//
-//     try {
-//         const result = await Cost.aggregate([
-//             { $match: { userid: parseInt(userid) } },
-//             { $group: { _id: null, total: { $sum: "$sum" } } }
-//         ]);
-//
-//         const total = result.length > 0 ? result[0].total : 0;
-//         res.json({ userid: parseInt(userid), total:total });
-//     } catch (error) {
-//         res.status(500).json({ id: "server_error", message: error.message });
-//     }
-// });
-//
-// /**
-//  * Endpoint: POST /api/add
-//  * Purpose: Adds a new cost item after validating the user exists.
-//  */
-// router.post('/add', async (req, res) => {
-//     const { userid, description, category, sum, year, month, day } = req.body;
-//
-//     // 1. Validation for mandatory fields
-//     if (!userid || !description || !category || !sum) {
-//         return res.status(400).json({
-//             id: "validation_error",
-//             message: "userid, description, category, and sum are required."
-//         });
-//     }
-//
-//     try {
-//         // 2. Inter-Process Communication: Verify User Exists
-//         // This calls your User Process (Process 2)
-//         const userApiUrl = process.env.USER_API_URL;
-//         const userCheck = await fetch(`${userApiUrl}/api/users/${userid}`);
-//       //  console.log('userCheck', userCheck);
-//         if (!userCheck.ok) {
-//             return res.status(404).json({
-//                 id: "user_not_found",
-//                 message: "Cost cannot be added: User does not exist."
-//             });
-//         }
-//        // console.log('userApiUrl', `${userApiUrl}/api/users/${userid}`);
-//
-//         // 3. Create the Cost Item
-//         // If year/month/day aren't provided, server uses current time
-//         const createdAt = (year && month && day)
-//             ? new Date(year, month - 1, day)
-//             : new Date();
-//
-//         const newCost = new Cost({
-//             userid,
-//             description,
-//             category,
-//             sum,
-//             createdAt
-//         });
-//
-//         const savedCost = await newCost.save();
-//         //console.log('savedCost', savedCost);
-//        // await logEvent({ userid: req.body.userid }, "Cost item successfully saved to DB");
-//         logger.info({ userid: req.body.userid }, "Cost item successfully saved to DB");
-//         // 4. Log the access (Requirement: Pino + Log collection)
-//         // Note: The middleware usually handles general logs, but specific
-//         // endpoint logging is often done inside the logic for tracking successes.
-//      // pino.info({ userid, category, sum }, "New cost item added successfully");
-//
-//         // Return JSON document describing the added item
-//         res.status(201).json(savedCost);
-//
-//     } catch (error) {
-//         res.status(500).json({ id: "server_error", message: error.message });
-//     }
-// });
-// router.get('/report', async (req, res) => {
-//     const { id, year, month } = req.query;
-//
-//     if (!id || !year || !month) {
-//         return res.status(400).json({ id: "error", message: "Missing id, year, or month parameters" });
-//     }
-//
-//     try {
-//         // const userid = Number(id);
-//         const queryYear = parseInt(year);
-//         const queryMonth = parseInt(month);
-//         const userid=parseInt(id);
-//
-//         // 1. Determine if the requested month has already passed
-//         const now = new Date();
-//         const currentYear = now.getFullYear();
-//         const currentMonth = now.getMonth() + 1; // getMonth() is 0-indexed
-//         const isPastMonth = (parseInt(year) < currentYear) ||
-//             (parseInt(year) === currentYear && parseInt(month) < currentMonth);
-//       //  const isPastMonth = (queryYear < currentYear) || (queryYear === currentYear && queryMonth < currentMonth);
-//
-//
-//         // 2. If it's a past month, check the "computed" cache first
-//         if (isPastMonth) {
-//             console.log("Querying with:", {
-//                 userid: typeof userid, // Should be 'number'
-//                 year: typeof queryYear,
-//                 month: typeof queryMonth
-//             });
-//            const   existingReport = await Report.findOne({ userid: userid, year:queryYear, month:queryMonth },  { _id: 0 });
-//            // console.log('existingReport search result:', existingReport);
-//             if (existingReport) {
-//                 console.log('inside if  search result:', existingReport);
-//                 return res.json(existingReport);// החזרת הדוח השמור
-//             }
-//           //  console.log('inside if  is past month result:', existingReport);
-//           }
-//         // if (existingReport) {
-//         //     return res.json(existingReport.data);// החזרת הדוח השמור
-//         // }
-//       //  console.log('we allready have report or month is not passed', isPastMonth);
-//         // 3. Compute the data (Needed for both current month and "missing" past reports)
-//         const startDate = new Date(year, month - 1, 1);
-//         const endDate = new Date(year, month, 1);
-//
-//
-//         const costs = await Cost.find({
-//             userid: userid,
-//             createdAt: { $gte: startDate, $lt: endDate }
-//         });
-//
-//         // Grouping costs by category
-//         const categories = ['food', 'health', 'housing', 'sports', 'education'];
-//         const costsGrouped = categories.map(cat => {
-//             return {
-//                 [cat]: costs
-//                     .filter(item => item.category === cat)
-//                     .map(item => ({
-//                         sum: item.sum,
-//                         description: item.description,
-//                         day: new Date(item.createdAt).getDate() // חילוץ היום בחודש
-//                     }))
-//             };
-//         });
-//
-//
-//         const reportData = {
-//             userid,
-//             year: queryYear,
-//             month: queryMonth,
-//             costs: costsGrouped
-//         };
-//         logger.info({ userid: userid }, "Generate report");
-//         // 4. Save to cache ONLY if the month has passed (The Computed Design Pattern)
-//         if (isPastMonth) {
-//             const newReport = new Report(reportData);
-//             await newReport.save();
-//         }
-//
-//         // 5. Return the result
-//         res.json(reportData);
-//
-//     } catch (error) {
-//         res.status(500).json({ id: "server_error", message: error.message });
-//     }
-// });
-//
-// module.exports = router;
-//////////////////////////
+// Routes for cost endpoints
 const express = require('express');
 const router = express.Router();
 const Cost = require('../models/cost');
+const User = require('../models/user');
 const Report = require('../models/report');
-const { pino: logger } = require('../middlewares/logger');
+const { pino } = require('../middlewares/logger');
 
-// Define allowed categories for validation
-const VALID_CATEGORIES = ['food', 'health', 'housing', 'sports', 'education', 'transportation', 'other'];
+// Define allowed categories (matching requirements exactly)
+const VALID_CATEGORIES = ['food', 'health', 'housing', 'sports', 'education'];
 
-/**
- * Endpoint: POST /api/add
- * Purpose: Adds a new cost item after validating user and category.
- */
+// POST /api/add - add new cost item
 router.post('/add', async (req, res) => {
-    const { userid, description, category, sum, year, month, day } = req.body;
-
-    // 1. Validation for mandatory fields
-    if (!userid || !description || !category || !sum) {
-        return res.status(400).json({
-            id: "validation_error",
-            message: "userid, description, category, and sum are required."
-        });
-    }
-
-    // 2. Category Validation (Fixes the test failure)
-    if (!VALID_CATEGORIES.includes(category)) {
-        return res.status(400).json({
-            id: "validation_error",
-            message: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(', ')}`
-        });
-    }
-
     try {
-        // 3. Inter-Process Communication: Verify User Exists
-        const userApiUrl = process.env.USER_API_URL || 'http://localhost:3000';
-        const userCheck = await fetch(`${userApiUrl}/api/users/${userid}`);
+        const { userid, description, category, sum, year, month, day } = req.body;
 
-        if (!userCheck.ok) {
-            return res.status(404).json({
-                id: "user_not_found",
-                message: "Cost cannot be added: User does not exist."
+        // Validation for mandatory fields
+        if (!userid || !description || !category || sum === undefined) {
+            res.locals.errorId = 'VALIDATION_ERROR';
+            return res.status(400).json({
+                id: 'VALIDATION_ERROR',
+                message: 'userid, description, category, and sum are required'
             });
         }
 
-        // 4. Create the Cost Item
+        // Category validation
+        if (!VALID_CATEGORIES.includes(category)) {
+            res.locals.errorId = 'INVALID_CATEGORY';
+            return res.status(400).json({
+                id: 'INVALID_CATEGORY',
+                message: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(', ')}`
+            });
+        }
+
+        // Check if user exists directly in database
+        const user = await User.findOne({ id: userid });
+        if (!user) {
+            res.locals.errorId = 'USER_NOT_FOUND';
+            return res.status(404).json({
+                id: 'USER_NOT_FOUND',
+                message: 'User does not exist'
+            });
+        }
+
+        // Create the cost item
         const createdAt = (year && month && day)
             ? new Date(year, month - 1, day)
             : new Date();
 
-        const newCost = new Cost({
-            userid,
-            description,
-            category,
-            sum,
-            createdAt
+        const newCost = await Cost.create({
+            userid: userid,
+            description: description,
+            category: category,
+            sum: sum,
+            createdAt: createdAt
         });
 
-        const savedCost = await newCost.save();
-        logger.info({ userid: userid }, "Cost item successfully saved to DB");
-
-        res.status(201).json(savedCost);
+        pino.info(`Cost item successfully saved for user ${userid}`);
+        res.status(201).json(newCost);
 
     } catch (error) {
-        res.status(500).json({ id: "server_error", message: error.message });
+        pino.error(`Error adding cost: ${error.message}`);
+        res.status(500).json({
+            id: 'SERVER_ERROR',
+            message: 'Unable to add cost item'
+        });
     }
 });
 
-/**
- * Endpoint: GET /api/report
- * Purpose: Returns a grouped report, using Computed Design Pattern for past months.
- */
+// GET /api/report - get monthly report (Computed Design Pattern)
 router.get('/report', async (req, res) => {
-    const { id, year, month } = req.query;
-
-    // Validation: Ensures 'id' is used (matching your route logic)
-    if (!id || !year || !month) {
-        return res.status(400).json({
-            id: "error",
-            message: "Missing id, year, or month parameters"
-        });
-    }
-
     try {
+        const { id, year, month } = req.query;
+
+        // Validation
+        if (!id || !year || !month) {
+            res.locals.errorId = 'VALIDATION_ERROR';
+            return res.status(400).json({
+                id: 'VALIDATION_ERROR',
+                message: 'Missing id, year, or month parameters'
+            });
+        }
+
+        const userid = parseInt(id);
         const queryYear = parseInt(year);
         const queryMonth = parseInt(month);
-        const userid = parseInt(id);
 
-        // 1. Determine if the requested month has already passed
+        /*
+         * Computed Design Pattern Implementation:
+         * For past months, check if a pre-calculated report exists in the database
+         * If it exists, return it immediately (no need to recalculate)
+         * If not, calculate it from the costs collection and save it for future requests
+         * Current and future months are always calculated fresh (not cached)
+         */
         const now = new Date();
         const currentYear = now.getFullYear();
         const currentMonth = now.getMonth() + 1;
         const isPastMonth = (queryYear < currentYear) ||
             (queryYear === currentYear && queryMonth < currentMonth);
 
-        // 2. Computed Pattern: Check cache for past months
+        // Check cache for past months
         if (isPastMonth) {
             const existingReport = await Report.findOne(
                 { userid: userid, year: queryYear, month: queryMonth },
@@ -277,11 +106,12 @@ router.get('/report', async (req, res) => {
             );
 
             if (existingReport) {
+                pino.info(`Returning cached report for user ${userid}`);
                 return res.json(existingReport);
             }
         }
 
-        // 3. Compute the data
+        // Compute the data from costs collection
         const startDate = new Date(queryYear, queryMonth - 1, 1);
         const endDate = new Date(queryYear, queryMonth, 1);
 
@@ -290,13 +120,13 @@ router.get('/report', async (req, res) => {
             createdAt: { $gte: startDate, $lt: endDate }
         });
 
-        // Grouping costs by category
+        // Group costs by category (exactly as in requirements)
         const categories = ['food', 'health', 'housing', 'sports', 'education'];
-        const costsGrouped = categories.map(cat => {
+        const costsGrouped = categories.map((cat) => {
             return {
                 [cat]: costs
-                    .filter(item => item.category === cat)
-                    .map(item => ({
+                    .filter((item) => item.category === cat)
+                    .map((item) => ({
                         sum: item.sum,
                         description: item.description,
                         day: new Date(item.createdAt).getDate()
@@ -305,42 +135,33 @@ router.get('/report', async (req, res) => {
         });
 
         const reportData = {
-            userid,
+            userid: userid,
             year: queryYear,
             month: queryMonth,
             costs: costsGrouped
         };
 
-        logger.info({ userid: userid }, "Generated report");
+        pino.info(`Generated report for user ${userid}`);
 
-        // 4. Save to cache ONLY if the month has passed
+        // Save to cache only if the month has passed
         if (isPastMonth) {
-            const newReport = new Report(reportData);
-            await newReport.save();
+            try {
+                await Report.create(reportData);
+                pino.info(`Cached report for user ${userid}`);
+            } catch (err) {
+                // If duplicate, just continue
+                pino.warn(`Failed to cache report: ${err.message}`);
+            }
         }
 
         res.json(reportData);
 
     } catch (error) {
-        res.status(500).json({ id: "server_error", message: error.message });
-    }
-});
-
-/**
- * Endpoint: GET /api/total/:userid
- * Purpose: Helper for calculation.
- */
-router.get('/total/:userid', async (req, res) => {
-    const { userid } = req.params;
-    try {
-        const result = await Cost.aggregate([
-            { $match: { userid: parseInt(userid) } },
-            { $group: { _id: null, total: { $sum: "$sum" } } }
-        ]);
-        const total = result.length > 0 ? result[0].total : 0;
-        res.json({ userid: parseInt(userid), total: total });
-    } catch (error) {
-        res.status(500).json({ id: "server_error", message: error.message });
+        pino.error(`Error generating report: ${error.message}`);
+        res.status(500).json({
+            id: 'SERVER_ERROR',
+            message: 'Unable to generate report'
+        });
     }
 });
 
