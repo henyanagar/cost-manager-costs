@@ -5,16 +5,16 @@ const Cost = require('../models/cost');
 const User = require('../models/user');
 const Report = require('../models/report');
 const { pino } = require('../middlewares/logger');
-
-// Define allowed categories (matching requirements exactly)
-const VALID_CATEGORIES = ['food', 'health', 'housing', 'sports', 'education'];
+const { validateUserId, validateCategory, validateSum, validateYear, validateMonth } = require('../utils/validators');
 
 // POST /api/add - add new cost item
 router.post('/add', async (req, res) => {
     try {
+        pino.info('Accessing POST /api/add endpoint');
+
         const { userid, description, category, sum, year, month, day } = req.body;
 
-        // Validation for mandatory fields
+        // Validate required fields
         if (!userid || !description || !category || sum === undefined) {
             res.locals.errorId = 'VALIDATION_ERROR';
             return res.status(400).json({
@@ -23,17 +23,42 @@ router.post('/add', async (req, res) => {
             });
         }
 
-        // Category validation
-        if (!VALID_CATEGORIES.includes(category)) {
-            res.locals.errorId = 'INVALID_CATEGORY';
+        // Validate user ID
+        const useridValidation = validateUserId(userid);
+        if (!useridValidation.isValid) {
+            res.locals.errorId = 'INVALID_USERID';
             return res.status(400).json({
-                id: 'INVALID_CATEGORY',
-                message: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(', ')}`
+                id: 'INVALID_USERID',
+                message: useridValidation.error
             });
         }
 
+        const validUserId = useridValidation.value;
+
+        // Validate category
+        const categoryValidation = validateCategory(category);
+        if (!categoryValidation.isValid) {
+            res.locals.errorId = 'INVALID_CATEGORY';
+            return res.status(400).json({
+                id: 'INVALID_CATEGORY',
+                message: categoryValidation.error
+            });
+        }
+
+        // Validate sum
+        const sumValidation = validateSum(sum);
+        if (!sumValidation.isValid) {
+            res.locals.errorId = 'INVALID_SUM';
+            return res.status(400).json({
+                id: 'INVALID_SUM',
+                message: sumValidation.error
+            });
+        }
+
+        const validSum = sumValidation.value;
+
         // Check if user exists directly in database
-        const user = await User.findOne({ id: userid });
+        const user = await User.findOne({ id: validUserId });
         if (!user) {
             res.locals.errorId = 'USER_NOT_FOUND';
             return res.status(404).json({
@@ -42,20 +67,20 @@ router.post('/add', async (req, res) => {
             });
         }
 
-        // Create the cost item
+        // Create the cost item with optional date
         const createdAt = (year && month && day)
             ? new Date(year, month - 1, day)
             : new Date();
 
         const newCost = await Cost.create({
-            userid: userid,
-            description: description,
+            userid: validUserId,
+            description: description.trim(),
             category: category,
-            sum: sum,
+            sum: validSum,
             createdAt: createdAt
         });
 
-        pino.info(`Cost item successfully saved for user ${userid}`);
+        pino.info(`Cost item successfully saved for user ${validUserId}`);
         res.status(201).json(newCost);
 
     } catch (error) {
@@ -70,9 +95,11 @@ router.post('/add', async (req, res) => {
 // GET /api/report - get monthly report (Computed Design Pattern)
 router.get('/report', async (req, res) => {
     try {
+        pino.info('Accessing GET /api/report endpoint');
+
         const { id, year, month } = req.query;
 
-        // Validation
+        // Validate required parameters
         if (!id || !year || !month) {
             res.locals.errorId = 'VALIDATION_ERROR';
             return res.status(400).json({
@@ -81,9 +108,41 @@ router.get('/report', async (req, res) => {
             });
         }
 
-        const userid = parseInt(id);
-        const queryYear = parseInt(year);
-        const queryMonth = parseInt(month);
+        // Validate user ID
+        const useridValidation = validateUserId(id);
+        if (!useridValidation.isValid) {
+            res.locals.errorId = 'INVALID_ID';
+            return res.status(400).json({
+                id: 'INVALID_ID',
+                message: useridValidation.error
+            });
+        }
+
+        const userid = useridValidation.value;
+
+        // Validate year
+        const yearValidation = validateYear(year);
+        if (!yearValidation.isValid) {
+            res.locals.errorId = 'INVALID_YEAR';
+            return res.status(400).json({
+                id: 'INVALID_YEAR',
+                message: yearValidation.error
+            });
+        }
+
+        const queryYear = yearValidation.value;
+
+        // Validate month
+        const monthValidation = validateMonth(month);
+        if (!monthValidation.isValid) {
+            res.locals.errorId = 'INVALID_MONTH';
+            return res.status(400).json({
+                id: 'INVALID_MONTH',
+                message: monthValidation.error
+            });
+        }
+
+        const queryMonth = monthValidation.value;
 
         /*
          * Computed Design Pattern Implementation:
@@ -120,7 +179,7 @@ router.get('/report', async (req, res) => {
             createdAt: { $gte: startDate, $lt: endDate }
         });
 
-        // Group costs by category (exactly as in requirements)
+        // Group costs by category
         const categories = ['food', 'health', 'housing', 'sports', 'education'];
         const costsGrouped = categories.map((cat) => {
             return {
