@@ -78,6 +78,37 @@ describe('Costs API', () => {
         expect(response.body.message).toContain('Invalid category');
     });
 
+    // Test POST /api/add - invalid sum (zero)
+    test('POST /api/add should fail with sum of 0', async () => {
+        const response = await request(app)
+            .post('/api/add')
+            .send({
+                userid: 123123,
+                description: 'Test',
+                category: 'food',
+                sum: 0
+            });
+
+        expect(response.status).toBe(400);
+        expect(response.body.id).toBe('INVALID_SUM');
+        expect(response.body.message).toContain('greater than 0');
+    });
+
+    // Test POST /api/add - invalid sum (negative)
+    test('POST /api/add should fail with negative sum', async () => {
+        const response = await request(app)
+            .post('/api/add')
+            .send({
+                userid: 123123,
+                description: 'Test',
+                category: 'food',
+                sum: -50
+            });
+
+        expect(response.status).toBe(400);
+        expect(response.body.id).toBe('INVALID_SUM');
+    });
+
     // Test POST /api/add - user doesn't exist
     test('POST /api/add should fail if user does not exist', async () => {
         User.findOne.mockResolvedValue(null);
@@ -97,6 +128,13 @@ describe('Costs API', () => {
 
     // Test GET /api/report - successful report generation
     test('GET /api/report should return monthly report', async () => {
+        // Mock user exists - THIS WAS MISSING!
+        User.findOne.mockResolvedValue({
+            id: 123123,
+            first_name: 'mosh',
+            last_name: 'israeli'
+        });
+
         Report.findOne.mockResolvedValue(null); // No cached report
 
         Cost.find.mockResolvedValue([
@@ -139,8 +177,32 @@ describe('Costs API', () => {
         expect(response.body.id).toBe('VALIDATION_ERROR');
     });
 
+    // Test GET /api/report - user doesn't exist
+    test('GET /api/report should fail if user does not exist', async () => {
+        // Mock user doesn't exist - THIS TEST WAS MISSING!
+        User.findOne.mockResolvedValue(null);
+
+        const response = await request(app)
+            .get('/api/report')
+            .query({
+                id: 999999,
+                year: 2026,
+                month: 1
+            });
+
+        expect(response.status).toBe(404);
+        expect(response.body.id).toBe('USER_NOT_FOUND');
+    });
+
     // Test GET /api/report - returns cached report
     test('GET /api/report should return cached report for past months', async () => {
+        // Mock user exists - THIS WAS MISSING!
+        User.findOne.mockResolvedValue({
+            id: 123123,
+            first_name: 'mosh',
+            last_name: 'israeli'
+        });
+
         const cachedReport = {
             userid: 123123,
             year: 2023,
@@ -160,6 +222,34 @@ describe('Costs API', () => {
 
         expect(response.status).toBe(200);
         expect(response.body.userid).toBe(123123);
+    });
+
+    // Test GET /api/report - invalid year
+    test('GET /api/report should fail with invalid year', async () => {
+        const response = await request(app)
+            .get('/api/report')
+            .query({
+                id: 123123,
+                year: 1999, // Before 2000
+                month: 1
+            });
+
+        expect(response.status).toBe(400);
+        expect(response.body.id).toBe('INVALID_YEAR');
+    });
+
+    // Test GET /api/report - invalid month
+    test('GET /api/report should fail with invalid month', async () => {
+        const response = await request(app)
+            .get('/api/report')
+            .query({
+                id: 123123,
+                year: 2026,
+                month: 13 // Invalid month
+            });
+
+        expect(response.status).toBe(400);
+        expect(response.body.id).toBe('INVALID_MONTH');
     });
 
 });

@@ -12,8 +12,10 @@ const requestLogger = async (req, res, next) => {
 
         // Determine action description based on request
         if (method === 'GET' && path.includes('/report')) {
-            const { id, year, month } = req.query;
-            action = `Generate Report for User ${id || 'unknown'} (${month}/${year})`;
+            const userId = req.query?.id || 'unknown';
+            const year = req.query?.year || 'unknown';
+            const month = req.query?.month || 'unknown';
+            action = `Generate Report for User ${userId} (${month}/${year})`;
         }
         else if (method === 'POST' && path.includes('/add')) {
             action = 'Add New Cost Item';

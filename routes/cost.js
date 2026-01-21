@@ -144,6 +144,16 @@ router.get('/report', async (req, res) => {
 
         const queryMonth = monthValidation.value;
 
+        // Check if user exists before generating report
+        const user = await User.findOne({ id: userid });
+        if (!user) {
+            res.locals.errorId = 'USER_NOT_FOUND';
+            return res.status(404).json({
+                id: 'USER_NOT_FOUND',
+                message: 'User does not exist'
+            });
+        }
+
         /*
          * Computed Design Pattern Implementation:
          * For past months, check if a pre-calculated report exists in the database
