@@ -12,7 +12,7 @@ router.post('/add', async (req, res) => {
     try {
         pino.info('Accessing POST /api/add endpoint');
 
-        const { userid, description, category, sum, year, month, day } = req.body;
+        const { userid, description, category, sum } = req.body;
 
         // Validate required fields
         if (!userid || !description || !category || sum === undefined) {
@@ -67,17 +67,13 @@ router.post('/add', async (req, res) => {
             });
         }
 
-        // Create the cost item with optional date
-        const createdAt = (year && month && day)
-            ? new Date(year, month - 1, day)
-            : new Date();
-
+        // Always use current date - server timestamp ensures costs are added to current month only
         const newCost = await Cost.create({
             userid: validUserId,
             description: description.trim(),
             category: category,
             sum: validSum,
-            createdAt: createdAt
+            createdAt: new Date()
         });
 
         pino.info(`Cost item successfully saved for user ${validUserId}`);
