@@ -41,7 +41,7 @@ const requestLogger = async (req, res, next) => {
         try {
             const logApiUrl = process.env.LOG_API_URL;
             if (logApiUrl) {
-                await fetch(`${logApiUrl}/api/logs/add`, {
+                await fetch(`${logApiUrl}/api/add`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(logData)
